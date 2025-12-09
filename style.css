@@ -1,0 +1,101 @@
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+#app {
+    max-width: 800px;
+    margin: auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background-color: #4CAF50;
+    color: white;
+}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+tr:hover {
+    background-color: #ddd;
+}
+
+td button {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+td button.edit {
+    background-color: #ffc107;
+    color: white;
+}
+
+td button.delete {
+    background-color: #f44336;
+    color: white;
+}
+
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.page-info, .page-controls {
+    display: flex;
+    align-items: center;
+}
+
+.page-controls button {
+    padding: 8px 12px;
+    margin: 0 5px;
+    border: 1px solid #ddd;
+    background-color: #f8f8f8;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.page-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.page-controls #page-numbers span {
+    margin: 0 5px;
+    cursor: pointer;
+    padding: 8px 12px;
+}
+
+.page-controls #page-numbers span.active {
+    font-weight: bold;
+    color: #4CAF50;
+    text-decoration: underline;
+}

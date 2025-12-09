@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料管理系統</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>資料管理系統</h1>
+
+    <div id="app">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>姓名</th>
+                    <th>電子郵件</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="data-table-body">
+                <!-- 資料將由 JavaScript 動態載入 -->
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <div class="page-info">
+                <span>每頁顯示</span>
+                <select id="items-per-page">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+                <span>筆</span>
+            </div>
+            <div class="page-controls">
+                <button id="prev-page">上一頁</button>
+                <span id="page-numbers"></span>
+                <button id="next-page">下一頁</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
