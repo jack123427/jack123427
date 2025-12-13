@@ -87,17 +87,28 @@ python3 src/main.py
 
 #### b) 啟動 API 服務
 
-您可以執行 `app.py` 來啟動一個 API 伺服器。
+1.  **在您的終端機中，啟動伺服器**：
+    ```bash
+    # Linux / macOS
+    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+    python3 src/app.py
 
-```bash
-python3 src/app.py
-```
+    # Windows PowerShell
+    $env:PYTHONPATH += ";$(pwd)/src"
+    python3 src/app.py
+    ```
+    伺服器啟動後，您會看到類似 `* Running on http://127.0.0.1:5000/` 的訊息。請保持這個終端機視窗**開啟**。
 
-伺服器啟動後，您可以使用 `curl` 或其他工具來測試 API。例如，要預測台積電 (2330) 的股價：
+2.  **另外開啟一個新的終端機視窗**，然後使用 `curl` (或 `Invoke-WebRequest`) 來測試 API。
 
-```bash
-curl "http://127.0.0.1:5000/predict?stock_code=2330"
-```
+    例如，要預測台積電 (2330) 的股價：
+    ```bash
+    # 通用指令
+    curl "http://127.0.0.1:5000/predict?stock_code=2330"
+
+    # 如果您在 Windows PowerShell 中遇到 curl 的問題，也可以使用 Invoke-WebRequest
+    Invoke-WebRequest -Uri "http://127.0.0.1:5000/predict?stock_code=2330"
+    ```
 
 ## Visual Studio Code (VSCode) 使用者指南
 
