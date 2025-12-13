@@ -23,7 +23,7 @@
 │   ├── test_data_fetcher.py # data_fetcher.py 的單元測試。
 │   └── test_model.py     # model.py 的單元測試。
 ├── .gitignore            # 忽略不需要加入版本控制的檔案。
-└── requirements.txt      # 專案所需的 Python 相依套件。
+└── requirements.txt      # 專案所需的核心 Python 相依套件。
 ```
 
 ## 安裝與執行
@@ -34,9 +34,17 @@
 
 ### 2. 安裝相依套件
 
+安裝分為兩步驟：首先安裝 `requirements.txt` 中的核心套件，然後再單獨安裝 `xgboost`。
+
 ```bash
+# 步驟 1: 安裝核心套件
 pip install -r requirements.txt
+
+# 步驟 2: 安裝 XGBoost (CPU 版本)
+pip install xgboost
 ```
+
+**備註**: `xgboost` 的 GPU 版本安裝過程較為複雜，且與您的硬體環境高度相關。如果您需要使用 GPU 進行訓練，請參考 [XGBoost 官方安裝文件](https://xgboost.readthedocs.io/en/stable/install.html#gpu-support)。
 
 ### 3. 執行方式
 
@@ -73,9 +81,10 @@ curl "http://127.0.0.1:5000/predict?stock_code=2330"
     conda create --name stock-prediction python=3.9
     conda activate stock-prediction
     ```
-2.  **安裝相依套件**：
+2.  **安裝相依套件** (依照新的兩步驟流程)：
     ```bash
     pip install -r requirements.txt
+    pip install xgboost
     ```
 3.  **執行程式**：執行方式與上方「執行方式」章節相同。
 
