@@ -40,11 +40,18 @@
 # 步驟 1: 安裝核心套件
 pip install -r requirements.txt
 
-# 步驟 2: 安裝 XGBoost (CPU 版本)
+# 步驟 2: 安裝 XGBoost (二選一)
+
+# (選項 A) 安裝 CPU 版本 (適用於所有使用者)
 pip install xgboost
+
+# (選項 B) 安裝 GPU CUDA 12 版本 (適用於有 NVIDIA GPU 且已安裝 CUDA 12 的使用者)
+# 注意：這需要先安裝 nvidia-pyindex
+pip install nvidia-pyindex
+pip install xgboost[cuda-version=12]
 ```
 
-**備註**: `xgboost` 的 GPU 版本安裝過程較為複雜，且與您的硬體環境高度相關。如果您需要使用 GPU 進行訓練，請參考 [XGBoost 官方安裝文件](https://xgboost.readthedocs.io/en/stable/install.html#gpu-support)。
+**備註**: 如果您需要安裝其他 CUDA 版本的 `xgboost`，請參考 [XGBoost 官方安裝文件](https://xgboost.readthedocs.io/en/stable/install.html#gpu-support)。
 
 ### 3. 執行方式
 
@@ -83,8 +90,15 @@ curl "http://127.0.0.1:5000/predict?stock_code=2330"
     ```
 2.  **安裝相依套件** (依照新的兩步驟流程)：
     ```bash
+    # 安裝核心套件
     pip install -r requirements.txt
+
+    # 根據您的需求，選擇一個 XGBoost 版本進行安裝
+    # CPU 版本:
     pip install xgboost
+    # GPU CUDA 12 版本:
+    # pip install nvidia-pyindex
+    # pip install xgboost[cuda-version=12]
     ```
 3.  **執行程式**：執行方式與上方「執行方式」章節相同。
 
