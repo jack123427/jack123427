@@ -50,21 +50,21 @@ pip install xgboost
 
 # --- Linux / macOS / Git Bash ---
 # 下載原始碼
-curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip -o nvidia-pyindex.zip
+curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/master.zip -o nvidia-pyindex.zip
 # 解壓縮
 unzip nvidia-pyindex.zip
 # 進入目錄並安裝
-cd nvidia-pyindex-main
+cd nvidia-pyindex-master
 pip install .
 cd ..
 
 # --- Windows PowerShell ---
 # 下載原始碼
-Invoke-WebRequest -Uri "https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip" -OutFile "nvidia-pyindex.zip"
+Invoke-WebRequest -Uri "https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/master.zip" -OutFile "nvidia-pyindex.zip"
 # 解壓縮
 Expand-Archive -Path "nvidia-pyindex.zip" -DestinationPath "."
 # 進入目錄並安裝
-cd nvidia-pyindex-main
+cd nvidia-pyindex-master
 pip install .
 cd ..
 
