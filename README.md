@@ -47,10 +47,15 @@ pip install xgboost
 
 # (選項 B) 安裝 GPU CUDA 12 版本 (適用於有 NVIDIA GPU 且已安裝 CUDA 12 的使用者)
 # 由於 nvidia-pyindex 的安裝問題，建議從原始碼安裝
-git clone https://github.com/NVIDIA/nvidia-pyindex.git
-cd nvidia-pyindex
+# 下載原始碼
+curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip -o nvidia-pyindex.zip
+# 解壓縮 (Windows 使用者可能需要手動解壓縮，或使用 tar 指令)
+unzip nvidia-pyindex.zip
+# 進入目錄並安裝
+cd nvidia-pyindex-main
 pip install .
 cd ..
+# 安裝 XGBoost
 pip install xgboost[cuda-version=12]
 
 ```
@@ -101,8 +106,9 @@ curl "http://127.0.0.1:5000/predict?stock_code=2330"
     # CPU 版本:
     pip install xgboost
     # GPU CUDA 12 版本:
-    # git clone https://github.com/NVIDIA/nvidia-pyindex.git
-    # cd nvidia-pyindex
+    # curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip -o nvidia-pyindex.zip
+    # unzip nvidia-pyindex.zip
+    # cd nvidia-pyindex-main
     # pip install .
     # cd ..
     # pip install xgboost[cuda-version=12]
