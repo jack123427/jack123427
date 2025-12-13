@@ -30,50 +30,44 @@
 
 ### 1. 環境準備
 
+強烈建議使用 [Anaconda](https://www.anaconda.com/products/distribution) 來管理您的 Python 環境，這可以大幅簡化安裝 `xgboost` GPU 版本的流程。
+
 建議使用 Python 3.8 或更新的版本。
 
 ### 2. 安裝相依套件
 
-安裝分為兩步驟：首先安裝 `requirements.txt` 中的核心套件，然後再單獨安裝 `xgboost`。
+#### a) 使用 Anaconda (建議)
+
+1.  **建立新的 conda 環境**：
+    ```bash
+    conda create --name stock-prediction python=3.9
+    conda activate stock-prediction
+    ```
+2.  **安裝核心套件**：
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  **安裝 XGBoost** (二選一)：
+    *   **CPU 版本**:
+        ```bash
+        conda install -c conda-forge xgboost
+        ```
+    *   **GPU 版本**: `conda` 會自動處理 CUDA toolkit 的相依性，是目前最建議的 GPU 版本安裝方式。
+        ```bash
+        conda install -c conda-forge py-xgboost-gpu
+        ```
+
+#### b) 使用 pip (不建議用於 GPU 版本)
+
+如果您不使用 Anaconda，您也可以使用 `pip` 來安裝。
 
 ```bash
 # 步驟 1: 安裝核心套件
 pip install -r requirements.txt
 
-# 步驟 2: 安裝 XGBoost (二選一)
-
-# (選項 A) 安裝 CPU 版本 (適用於所有使用者)
+# 步驟 2: 安裝 XGBoost (CPU 版本)
 pip install xgboost
-
-# (選項 B) 安裝 GPU CUDA 12 版本 (適用於有 NVIDIA GPU 且已安裝 CUDA 12 的使用者)
-# 由於 nvidia-pyindex 的安裝問題，建議從原始碼安裝
-
-# --- Linux / macOS / Git Bash ---
-# 下載原始碼
-curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/master.zip -o nvidia-pyindex.zip
-# 解壓縮
-unzip nvidia-pyindex.zip
-# 進入目錄並安裝
-cd nvidia-pyindex-master
-pip install .
-cd ..
-
-# --- Windows PowerShell ---
-# 下載原始碼
-Invoke-WebRequest -Uri "https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/master.zip" -OutFile "nvidia-pyindex.zip"
-# 解壓縮
-Expand-Archive -Path "nvidia-pyindex.zip" -DestinationPath "."
-# 進入目錄並安裝
-cd nvidia-pyindex-master
-pip install .
-cd ..
-
-# 安裝 XGBoost
-pip install xgboost[cuda-version=12]
-
 ```
-
-**備註**: 如果您需要安裝其他 CUDA 版本的 `xgboost`，請參考 [XGBoost 官方安裝文件](https://xgboost.readthedocs.io/en/stable/install.html#gpu-support)。
 
 ### 3. 執行方式
 
@@ -105,25 +99,7 @@ python3 src/app.py
 curl "http://127.0.0.1:5000/predict?stock_code=2330"
 ```
 
-## Anaconda 與 VSCode 使用者指南
-
-### Anaconda 使用者
-
-1.  **建立新的 conda 環境** (建議)：
-    ```bash
-    conda create --name stock-prediction python=3.9
-    conda activate stock-prediction
-    ```
-2.  **安裝相依套件** (依照新的兩步驟流程)：
-    ```bash
-    # 安裝核心套件
-    pip install -r requirements.txt
-
-    # 根據您的需求，選擇一個 XGBoost 版本進行安裝 (參考上方的選項 A 或 B)
-    ```
-3.  **執行程式**：執行方式與上方「執行方式」章節相同。
-
-### Visual Studio Code (VSCode) 使用者
+## Visual Studio Code (VSCode) 使用者指南
 
 1.  **選擇 Python 直譯器**：
     *   打開 VSCode 的命令面板 (View -> Command Palette... 或 `Ctrl+Shift+P`)。
