@@ -47,14 +47,27 @@ pip install xgboost
 
 # (選項 B) 安裝 GPU CUDA 12 版本 (適用於有 NVIDIA GPU 且已安裝 CUDA 12 的使用者)
 # 由於 nvidia-pyindex 的安裝問題，建議從原始碼安裝
+
+# --- Linux / macOS / Git Bash ---
 # 下載原始碼
 curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip -o nvidia-pyindex.zip
-# 解壓縮 (Windows 使用者可能需要手動解壓縮，或使用 tar 指令)
+# 解壓縮
 unzip nvidia-pyindex.zip
 # 進入目錄並安裝
 cd nvidia-pyindex-main
 pip install .
 cd ..
+
+# --- Windows PowerShell ---
+# 下載原始碼
+Invoke-WebRequest -Uri "https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip" -OutFile "nvidia-pyindex.zip"
+# 解壓縮
+Expand-Archive -Path "nvidia-pyindex.zip" -DestinationPath "."
+# 進入目錄並安裝
+cd nvidia-pyindex-main
+pip install .
+cd ..
+
 # 安裝 XGBoost
 pip install xgboost[cuda-version=12]
 
@@ -69,8 +82,12 @@ pip install xgboost[cuda-version=12]
 您可以直接執行 `main.py` 來啟動對市值前五大公司的完整分析流程 (資料獲取 -> 訓練 -> 回測 -> 預測)。
 
 ```bash
-# 由於 main.py 會從 src 目錄中 import 其他模組，我們需要將 src 加入 PYTHONPATH
+# Linux / macOS
 export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+python3 src/main.py
+
+# Windows PowerShell
+$env:PYTHONPATH += ";$(pwd)/src"
 python3 src/main.py
 ```
 
@@ -102,16 +119,7 @@ curl "http://127.0.0.1:5000/predict?stock_code=2330"
     # 安裝核心套件
     pip install -r requirements.txt
 
-    # 根據您的需求，選擇一個 XGBoost 版本進行安裝
-    # CPU 版本:
-    pip install xgboost
-    # GPU CUDA 12 版本:
-    # curl -L https://github.com/NVIDIA/nvidia-pyindex/archive/refs/heads/main.zip -o nvidia-pyindex.zip
-    # unzip nvidia-pyindex.zip
-    # cd nvidia-pyindex-main
-    # pip install .
-    # cd ..
-    # pip install xgboost[cuda-version=12]
+    # 根據您的需求，選擇一個 XGBoost 版本進行安裝 (參考上方的選項 A 或 B)
     ```
 3.  **執行程式**：執行方式與上方「執行方式」章節相同。
 
