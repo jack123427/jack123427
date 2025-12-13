@@ -158,3 +158,37 @@ python3 src/main.py
     ```
 3.  **開始偵錯**：
     *   現在您可以在 "Run and Debug" 分頁的下拉選單中，選擇 "Python: Main" 來執行 `main.py`，或選擇 "Python: Flask API" 來啟動 API 伺服器，並可以設定中斷點進行偵錯。
+
+## 疑難排解 (Troubleshooting)
+
+### XGBoost: `Mismatched version` 錯誤
+
+如果您在執行時遇到類似以下的錯誤訊息：
+`ValueError: Mismatched version between the Python package and the native shared object.`
+
+這通常是因為您的環境中同時存在透過 `pip` 和 `conda` 安裝的 `xgboost` 版本，導致了衝突。
+
+**解決方案**：請徹底移除所有 `xgboost` 版本，然後使用 `conda` 重新安裝一個乾淨的版本。
+
+1.  **啟動您的 conda 環境**：
+    ```bash
+    conda activate stock-prediction
+    ```
+
+2.  **徹底解除安裝** (重複執行直到確認沒有任何版本殘留)：
+    ```bash
+    pip uninstall xgboost -y
+    conda remove xgboost -y
+    ```
+    您可能需要重複執行 `pip uninstall` 幾次，以確保所有 pip 安裝的版本都被移除。
+
+3.  **使用 conda 重新安裝**：
+    ```bash
+    conda install -c conda-forge xgboost
+    ```
+    或者，如果您要安裝 GPU 版本：
+    ```bash
+    conda install -c conda-forge py-xgboost-gpu
+    ```
+
+這樣應該可以解決版本衝突的問題。

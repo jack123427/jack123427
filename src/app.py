@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from src.data_fetcher import get_historical_data_for_stock
+from src.data_fetcher import get_historical_data_for_stocks
 from src.model import train_and_predict
 
 app = Flask(__name__)
@@ -13,7 +13,7 @@ def predict():
     try:
         # 1. 獲取歷史資料
         print(f"正在為 {stock_code} 獲取歷史資料...")
-        history = get_historical_data_for_stock(stock_code, days=100)
+        history = get_historical_data_for_stocks([stock_code], days=100)
         if history is None:
             return jsonify({"error": f"找不到 {stock_code} 的歷史資料。"}), 404
 
