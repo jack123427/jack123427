@@ -1,7 +1,8 @@
 from flask import Flask, request, render_template, jsonify
-from src.data_fetcher import get_historical_data_for_stocks
+from src.data_fetcher import get_historical_data_for_stocks, get_daily_stock_data
 from src.model import train_and_predict
 import pandas as pd
+from datetime import datetime, timedelta
 
 app = Flask(__name__, template_folder='../templates')
 
@@ -17,9 +18,20 @@ def predict():
                                forecast_data=None)
 
     try:
-        # 1. 獲取歷史資料
+        # 1. 找到最後一個交易日
+        last_trading_day_prices = None
+        last_trading_date = datetime.today()
+        days_to_check = 0
+        while last_trading_day_prices is None or last_trading_day_prices.empty:
+            last_trading_date = datetime.today() - timedelta(days=days_to_check)
+            last_trading_day_prices = get_daily_stock_data(last_trading_date.strftime('%Y%m%d'))
+            days_to_check += 1
+            if days_to_check > 10:
+                return render_template('index.html', error="錯誤：過去 10 天內都找不到交易資料。")
+
+        # 2. 獲取歷史資料
         print(f"正在為 {stock_code} 獲取歷史資料...")
-        history_df = get_historical_data_for_stocks([stock_code], days=100)
+        history_df = get_historical_data_for_stocks([stock_code], days=120, end_date=last_trading_date)
         if history_df is None or history_df.empty:
             return render_template('index.html', error=f"找不到 {stock_code} 的歷史資料。")
 

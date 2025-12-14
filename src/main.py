@@ -20,15 +20,18 @@ def main():
     companies = get_listed_companies()
     last_trading_day_prices = get_daily_stock_data(datetime.today().strftime('%Y%m%d'))
 
-    days_to_check = 1
+    last_trading_date = datetime.today()
+    days_to_check = 0
     while last_trading_day_prices is None or last_trading_day_prices.empty:
-        print(f"找不到 {datetime.today().strftime('%Y%m%d')} 的資料，嘗試前一天...")
+        print(f"找不到 {last_trading_date.strftime('%Y%m%d')} 的資料，嘗試前一天...")
         last_trading_date = datetime.today() - timedelta(days=days_to_check)
         last_trading_day_prices = get_daily_stock_data(last_trading_date.strftime('%Y%m%d'))
         days_to_check += 1
         if days_to_check > 10:
             print("錯誤：過去 10 天內都找不到交易資料。")
             return
+
+    print(f"找到最後一個交易日: {last_trading_date.strftime('%Y-%m-%d')}")
 
     top_100 = calculate_top_100_market_cap(companies, last_trading_day_prices)
     if top_100 is None:
@@ -44,7 +47,7 @@ def main():
     # 2. 獲取特徵資料
     print("\n--- 步驟 2: 正在獲取特徵資料 ---")
 
-    historical_prices = get_historical_data_for_stocks(target_stock_codes, days=60) # 縮短天數
+    historical_prices = get_historical_data_for_stocks(target_stock_codes, days=120, end_date=last_trading_date) # 增加天數以計算特徵
     if historical_prices is None:
         print("錯誤：無法取得歷史股價資料。")
         return

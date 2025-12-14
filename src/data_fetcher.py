@@ -53,13 +53,21 @@ def calculate_top_100_market_cap(companies_df, prices_df):
     top_100 = merged_df.sort_values(by='市值', ascending=False).head(100)
     return top_100.reset_index(drop=True)
 
-def get_historical_data_for_stocks(stock_codes: list, days: int = 100):
+def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date: datetime = None):
     """
     取得一個股票代號列表在過去 N 天的每日交易資料。
     """
     all_data = []
-    start_date = datetime.today() - timedelta(days=1)
-    for i in range(days):
+    if end_date is None:
+        end_date = datetime.today()
+
+    # 從結束日期的前一天開始回溯
+    start_date = end_date - timedelta(days=1)
+
+    for i in range(days * 2): # 넉넉하게 2배의 기간을 탐색하여 휴일을 건너뜀
+        if len(all_data) >= days:
+            break
+
         date_to_fetch = start_date - timedelta(days=i)
         date_str = date_to_fetch.strftime('%Y%m%d')
         daily_data = get_daily_stock_data(date_str)
