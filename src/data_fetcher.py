@@ -55,31 +55,44 @@ def calculate_top_100_market_cap(companies_df, prices_df):
 
 def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date: datetime = None):
     """
-    取得一個股票代號列表在過去 N 天的每日交易資料，並確保資料的唯一性和正確性。
+    取得一個股票代號列表在過去 N 個「交易日」的每日交易資料。
     """
-    all_data = []
     if end_date is None:
         end_date = datetime.today()
 
-    start_date = end_date - timedelta(days=1)
+    unique_days_data = {}
+    current_date = end_date - timedelta(days=1)
+    days_collected = 0
+    days_searched = 0
 
-    # 1. 在一個較大的時間範圍內回溯，以確保能跨過假日，收集到足夠的交易日資料
-    for i in range(days * 2):
-        date_to_fetch = start_date - timedelta(days=i)
-        date_str = date_to_fetch.strftime('%Y%m%d')
+    # 持續回溯，直到收集到足夠天數的「獨立交易日」資料
+    while days_collected < days and days_searched < (days * 3): # 最多搜尋 days * 3 的範圍
+        date_str = current_date.strftime('%Y%m%d')
         daily_data = get_daily_stock_data(date_str)
+
         if daily_data is not None and not daily_data.empty:
-            filtered_data = daily_data[daily_data['公司代號'].isin(stock_codes)]
-            if not filtered_data.empty:
-                all_data.append(filtered_data)
+            # 使用 API 回傳的日期作為唯一鍵，避免假日重複問題
+            api_date_str = daily_data['Date'].iloc[0]
+            if api_date_str not in unique_days_data:
+                unique_days_data[api_date_str] = daily_data
+                days_collected += 1
+
+        current_date -= timedelta(days=1)
+        days_searched += 1
         time.sleep(0.1)
 
-    if not all_data:
+    if not unique_days_data:
         return None
 
+    all_data = list(unique_days_data.values())
     df = pd.concat(all_data, ignore_index=True)
 
-    # 2. 轉換日期格式
+    # 篩選出目標股票
+    df = df[df['公司代號'].isin(stock_codes)].copy()
+    if df.empty:
+        return None
+
+    # 轉換日期格式
     def convert_roc_to_ad(roc_date):
         roc_date_str = str(roc_date)
         year = int(roc_date_str[:-4]) + 1911
@@ -88,23 +101,11 @@ def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date:
         return datetime(year, month, day)
     df['Date'] = df['Date'].apply(convert_roc_to_ad)
 
-    # 3. 核心修正：根據股票代號和日期去除重複的資料
-    df.drop_duplicates(subset=['公司代號', 'Date'], keep='first', inplace=True)
-
-    # 4. 為每支股票選取最新的 N 天資料
-    df_list = []
-    for code in stock_codes:
-        stock_df = df[df['公司代號'] == code].copy()
-        stock_df = stock_df.sort_values(by='Date', ascending=False).head(days)
-        df_list.append(stock_df)
-
-    if not df_list:
-        return None
-
-    final_df = pd.concat(df_list, ignore_index=True)
+    # 為每支股票選取最新的 N 天資料
+    final_df = df.groupby('公司代號').apply(lambda x: x.nlargest(days, 'Date')).reset_index(drop=True)
     final_df.sort_values(by=['公司代號', 'Date'], ascending=[True, True], inplace=True)
 
-    return final_df.reset_index(drop=True)
+    return final_df
 
 def get_financial_statements(year: int, season: int):
     """
