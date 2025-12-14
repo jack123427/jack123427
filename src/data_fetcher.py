@@ -55,19 +55,16 @@ def calculate_top_100_market_cap(companies_df, prices_df):
 
 def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date: datetime = None):
     """
-    取得一個股票代號列表在過去 N 天的每日交易資料。
+    取得一個股票代號列表在過去 N 天的每日交易資料，並確保資料的唯一性和正確性。
     """
     all_data = []
     if end_date is None:
         end_date = datetime.today()
 
-    # 從結束日期的前一天開始回溯
     start_date = end_date - timedelta(days=1)
 
-    for i in range(days * 2): # 넉넉하게 2배의 기간을 탐색하여 휴일을 건너뜀
-        if len(all_data) >= days:
-            break
-
+    # 1. 在一個較大的時間範圍內回溯，以確保能跨過假日，收集到足夠的交易日資料
+    for i in range(days * 2):
         date_to_fetch = start_date - timedelta(days=i)
         date_str = date_to_fetch.strftime('%Y%m%d')
         daily_data = get_daily_stock_data(date_str)
@@ -75,12 +72,14 @@ def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date:
             filtered_data = daily_data[daily_data['公司代號'].isin(stock_codes)]
             if not filtered_data.empty:
                 all_data.append(filtered_data)
-        time.sleep(0.2) # 縮短 sleep 時間
+        time.sleep(0.1)
 
     if not all_data:
         return None
 
     df = pd.concat(all_data, ignore_index=True)
+
+    # 2. 轉換日期格式
     def convert_roc_to_ad(roc_date):
         roc_date_str = str(roc_date)
         year = int(roc_date_str[:-4]) + 1911
@@ -88,8 +87,24 @@ def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date:
         day = int(roc_date_str[-2:])
         return datetime(year, month, day)
     df['Date'] = df['Date'].apply(convert_roc_to_ad)
-    df.sort_values(by=['公司代號', 'Date'], ascending=[True, True], inplace=True)
-    return df.reset_index(drop=True)
+
+    # 3. 核心修正：根據股票代號和日期去除重複的資料
+    df.drop_duplicates(subset=['公司代號', 'Date'], keep='first', inplace=True)
+
+    # 4. 為每支股票選取最新的 N 天資料
+    df_list = []
+    for code in stock_codes:
+        stock_df = df[df['公司代號'] == code].copy()
+        stock_df = stock_df.sort_values(by='Date', ascending=False).head(days)
+        df_list.append(stock_df)
+
+    if not df_list:
+        return None
+
+    final_df = pd.concat(df_list, ignore_index=True)
+    final_df.sort_values(by=['公司代號', 'Date'], ascending=[True, True], inplace=True)
+
+    return final_df.reset_index(drop=True)
 
 def get_financial_statements(year: int, season: int):
     """
