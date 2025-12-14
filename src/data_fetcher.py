@@ -60,31 +60,24 @@ def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date:
     if end_date is None:
         end_date = datetime.today()
 
-    unique_days_data = {}
-    current_date = end_date - timedelta(days=1)
-    days_collected = 0
-    days_searched = 0
+    all_data = []
+    # 在一個足夠大的固定範圍內進行查詢，以處理假日和非交易日
+    # 例如，若需要 120 天，大約需要 120 * (7/5) = 168 個日曆日，再加上額外緩衝
+    search_range = int(days * 2.5)
+    start_date = end_date - timedelta(days=1)
 
-    # 持續回溯，直到收集到足夠天數的「獨立交易日」資料
-    while days_collected < days and days_searched < (days * 3): # 最多搜尋 days * 3 的範圍
-        date_str = current_date.strftime('%Y%m%d')
+    for i in range(search_range):
+        date_to_fetch = start_date - timedelta(days=i)
+        date_str = date_to_fetch.strftime('%Y%m%d')
         daily_data = get_daily_stock_data(date_str)
 
         if daily_data is not None and not daily_data.empty:
-            # 使用 API 回傳的日期作為唯一鍵，避免假日重複問題
-            api_date_str = daily_data['Date'].iloc[0]
-            if api_date_str not in unique_days_data:
-                unique_days_data[api_date_str] = daily_data
-                days_collected += 1
-
-        current_date -= timedelta(days=1)
-        days_searched += 1
+            all_data.append(daily_data)
         time.sleep(0.1)
 
-    if not unique_days_data:
+    if not all_data:
         return None
 
-    all_data = list(unique_days_data.values())
     df = pd.concat(all_data, ignore_index=True)
 
     # 篩選出目標股票
@@ -101,8 +94,11 @@ def get_historical_data_for_stocks(stock_codes: list, days: int = 100, end_date:
         return datetime(year, month, day)
     df['Date'] = df['Date'].apply(convert_roc_to_ad)
 
-    # 為每支股票選取最新的 N 天資料
-    final_df = df.groupby('公司代號').apply(lambda x: x.nlargest(days, 'Date')).reset_index(drop=True)
+    # 核心修正：去重並為每支股票精確選取最新的 N 天
+    df.sort_values(by='Date', ascending=False, inplace=True)
+    df.drop_duplicates(subset=['公司代號', 'Date'], keep='first', inplace=True)
+
+    final_df = df.groupby('公司代號').head(days).reset_index(drop=True)
     final_df.sort_values(by=['公司代號', 'Date'], ascending=[True, True], inplace=True)
 
     return final_df

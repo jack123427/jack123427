@@ -62,6 +62,12 @@ def main():
 
         stock_history = historical_prices[historical_prices['公司代號'] == stock_code].copy()
 
+        # 增加健壯性檢查，確保單支股票的資料量足夠
+        min_required_days = 50 # 넉넉하게 50일의 데이터를 요구 (MA21 계산 등에 필요)
+        if len(stock_history) < min_required_days:
+            print(f"警告：股票 {stock_code} 的歷史資料筆數不足 ({len(stock_history)} < {min_required_days})，跳過處理。")
+            continue
+
         print(f"--- {stock_code} 模型回測 ---")
         backtest_model(stock_history, test_days=30)
 
