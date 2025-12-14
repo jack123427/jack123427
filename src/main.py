@@ -62,8 +62,8 @@ def main():
         print(f"--- {stock_code} 模型回測 ---")
         backtest_model(stock_history, test_days=30)
 
-        print(f"\n--- {stock_code} 未來 10 天預測 ---")
-        forecast = train_and_predict(stock_history, forecast_days=10)
+        print(f"\n--- {stock_code} 未來 30 天預測 ---")
+        forecast = train_and_predict(stock_history, forecast_days=30)
         if forecast is not None:
             print(forecast.to_string())
 

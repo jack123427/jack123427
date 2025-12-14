@@ -17,7 +17,7 @@ def create_features(df):
     df['dayofyear'] = df['Date'].dt.dayofyear
     return df
 
-def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 10):
+def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     """
     使用 XGBoost 模型訓練並預測未來 N 天的股價走勢。
     """
@@ -49,30 +49,36 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 10):
                                eval_metric='rmse')
         reg.fit(X, y, eval_set=[(X, y)], verbose=False)
 
-        # 預測未來
-        future_dates = pd.date_range(start=data.index[-1] + pd.Timedelta(days=1), periods=forecast_days)
-
-        # 為了預測，我們需要最後一筆已知的資料來建立特徵
-        last_known_data = features_df.iloc[-1]
+        # === 迭代預測未來 ===
         predictions = []
 
-        for date in future_dates:
-            # 建立預測用的特徵
-            new_row = pd.DataFrame([last_known_data], index=[date])
-            new_row = create_features(new_row.reset_index().rename(columns={'index':'Date'})).set_index('Date')
+        # 獲取最後一筆真實資料的特徵和價格
+        last_features = X.iloc[-1:].copy()
 
-            # 更新 lag 特徵
-            for i in range(1, 6):
-                 new_row[f'lag_{i}'] = last_known_data[f'lag_{i-1}'] if i > 1 else last_known_data['ClosingPrice']
+        for _ in range(forecast_days):
+            # 預測下一天
+            next_pred = reg.predict(last_features[FEATURES])[0]
+            predictions.append(next_pred)
 
-            # 預測
-            pred = reg.predict(new_row[FEATURES])[0]
-            predictions.append(pred)
+            # 建立下一天的日期
+            next_date = last_features.index[0] + pd.Timedelta(days=1)
 
-            # 更新 last_known_data 以進行下一次預測
-            last_known_data = new_row.iloc[0]
-            last_known_data['ClosingPrice'] = pred
+            # 建立新的特徵 DataFrame，用於下一次預測
+            new_features = pd.DataFrame(index=[next_date])
 
+            # 1. 產生新的時間特徵
+            new_features = create_features(new_features.reset_index().rename(columns={'index': 'Date'}))
+            new_features.set_index('Date', inplace=True)
+
+            # 2. 滾動更新 lag 特徵
+            new_features['lag_1'] = next_pred
+            for i in range(2, 6):
+                new_features[f'lag_{i}'] = last_features[f'lag_{i-1}'].values[0]
+
+            # 更新 last_features 以供下一次迴圈使用
+            last_features = new_features.copy()
+
+        future_dates = pd.date_range(start=data.index[-1] + pd.Timedelta(days=1), periods=forecast_days)
         forecast_df = pd.DataFrame({'Date': future_dates, 'PredictedPrice': predictions})
         return forecast_df
 
@@ -133,9 +139,9 @@ if __name__ == '__main__':
     sample_history = pd.DataFrame({'Date': dates, 'ClosingPrice': prices})
 
     print("--- 測試 XGBoost 模型預測 ---")
-    forecast_result = train_and_predict(sample_history, forecast_days=10)
+    forecast_result = train_and_predict(sample_history, forecast_days=30)
     if forecast_result is not None:
-        print("未來 10 天的預測結果:")
+        print("未來 30 天的預測結果:")
         print(forecast_result.to_string())
 
     print("\n" + "="*50 + "\n")
