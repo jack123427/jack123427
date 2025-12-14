@@ -12,9 +12,9 @@ from model import train_and_predict, backtest_model
 class TestModel(unittest.TestCase):
 
     def setUp(self):
-        # 建立一個通用的假歷史資料
-        dates = pd.to_datetime(pd.date_range(start="2024-01-01", periods=30))
-        prices = pd.Series([100 + i for i in range(30)])
+        # 建立一個通用的假歷史資料，長度增加到 50 以滿足特徵計算的需求
+        dates = pd.to_datetime(pd.date_range(start="2024-01-01", periods=50))
+        prices = pd.Series([100 + i for i in range(50)])
         self.sample_history = pd.DataFrame({'Date': dates, 'ClosingPrice': prices})
 
     def test_train_and_predict(self):

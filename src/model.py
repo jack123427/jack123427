@@ -8,36 +8,43 @@ warnings.filterwarnings("ignore")
 
 def create_features(df):
     """
-    從時間序列資料中建立特徵。
+    從時間序列資料中建立更豐富的特徵工程。
     """
     df = df.copy()
-    df['dayofweek'] = df['Date'].dt.dayofweek
-    df['month'] = df['Date'].dt.month
-    df['year'] = df['Date'].dt.year
-    df['dayofyear'] = df['Date'].dt.dayofyear
+
+    # 移动平均线
+    df['MA7'] = df['ClosingPrice'].rolling(window=7).mean()
+    df['MA21'] = df['ClosingPrice'].rolling(window=21).mean()
+    df['MA_diff'] = df['MA7'] - df['MA21']
+
+    # RSI (相对强弱指数)
+    delta = df['ClosingPrice'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    # 建立延遲特徵
+    for i in range(1, 6):
+        df[f'lag_{i}'] = df['ClosingPrice'].shift(i)
+
     return df
 
 def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     """
     使用 XGBoost 模型訓練並預測未來 N 天的股價走勢。
     """
-    if historical_data is None or len(historical_data) < 20:
+    if historical_data is None or len(historical_data) < 30: # 需要更多資料來計算特徵
         return None
 
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
-        # 建立時間特徵
-        features_df = create_features(data.reset_index())
-        features_df.set_index('Date', inplace=True)
-
-        # 建立延遲特徵
-        for i in range(1, 6):
-            features_df[f'lag_{i}'] = features_df['ClosingPrice'].shift(i)
-
+        # 建立特徵
+        features_df = create_features(data)
         features_df.dropna(inplace=True)
 
-        FEATURES = ['dayofweek', 'month', 'year', 'dayofyear'] + [f'lag_{i}' for i in range(1, 6)]
+        FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]
         TARGET = 'ClosingPrice'
 
         X = features_df[FEATURES]
@@ -52,31 +59,24 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
         # === 迭代預測未來 ===
         predictions = []
 
-        # 獲取最後一筆真實資料的特徵和價格
-        last_features = X.iloc[-1:].copy()
+        # 建立一个 DataFrame 来储存历史和未来的价格，用于动态计算特徵
+        price_series = data['ClosingPrice'].copy()
 
-        for _ in range(forecast_days):
+        for i in range(forecast_days):
+            # 取得最新的价格序列以建立特徵
+            current_series_df = pd.DataFrame({'ClosingPrice': price_series})
+
+            # 建立最新的特徵
+            latest_features_df = create_features(current_series_df)
+            last_features = latest_features_df[FEATURES].iloc[-1:]
+
             # 預測下一天
-            next_pred = reg.predict(last_features[FEATURES])[0]
+            next_pred = reg.predict(last_features)[0]
             predictions.append(next_pred)
 
-            # 建立下一天的日期
-            next_date = last_features.index[0] + pd.Timedelta(days=1)
-
-            # 建立新的特徵 DataFrame，用於下一次預測
-            new_features = pd.DataFrame(index=[next_date])
-
-            # 1. 產生新的時間特徵
-            new_features = create_features(new_features.reset_index().rename(columns={'index': 'Date'}))
-            new_features.set_index('Date', inplace=True)
-
-            # 2. 滾動更新 lag 特徵
-            new_features['lag_1'] = next_pred
-            for i in range(2, 6):
-                new_features[f'lag_{i}'] = last_features[f'lag_{i-1}'].values[0]
-
-            # 更新 last_features 以供下一次迴圈使用
-            last_features = new_features.copy()
+            # 将预测结果加入价格序列，用于下一次迴圈
+            next_date = price_series.index[-1] + pd.Timedelta(days=1)
+            price_series.loc[next_date] = next_pred
 
         future_dates = pd.date_range(start=data.index[-1] + pd.Timedelta(days=1), periods=forecast_days)
         forecast_df = pd.DataFrame({'Date': future_dates, 'PredictedPrice': predictions})
@@ -90,20 +90,17 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
     """
     對 XGBoost 模型進行回測。
     """
-    if historical_data is None or len(historical_data) < (test_days + 20):
+    if historical_data is None or len(historical_data) < (test_days + 30):
         return None
 
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
         # 建立特徵
-        features_df = create_features(data.reset_index())
-        features_df.set_index('Date', inplace=True)
-        for i in range(1, 6):
-            features_df[f'lag_{i}'] = features_df['ClosingPrice'].shift(i)
+        features_df = create_features(data)
         features_df.dropna(inplace=True)
 
-        FEATURES = ['dayofweek', 'month', 'year', 'dayofyear'] + [f'lag_{i}' for i in range(1, 6)]
+        FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]
         TARGET = 'ClosingPrice'
 
         X = features_df[FEATURES]
@@ -133,9 +130,12 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
         print(f"模型回測時發生錯誤: {e}")
         return None
 
+import numpy as np
+
 if __name__ == '__main__':
     dates = pd.to_datetime(pd.date_range(start="2024-01-01", periods=100))
-    prices = pd.Series([100 + i + (i//10)*3 for i in range(100)])
+    # 建立一个更有趋势性的假资料
+    prices = pd.Series([100 + i*0.5 + (i//10)*5 - (i//20)*3 + 5*np.sin(i/7) for i in range(100)])
     sample_history = pd.DataFrame({'Date': dates, 'ClosingPrice': prices})
 
     print("--- 測試 XGBoost 模型預測 ---")
