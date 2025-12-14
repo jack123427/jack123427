@@ -3,37 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣股市預測</title>
+    <title>台灣市值百大個股預測</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
-        .container { max-width: 800px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .container { max-width: 1000px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #333; }
-        form { display: flex; justify-content: center; margin-bottom: 20px; }
-        input[type="text"] { width: 200px; padding: 10px; border-radius: 4px; border: 1px solid #ddd; }
-        button { padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+        form { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; gap: 10px; }
+        select { font-size: 16px; padding: 8px; border-radius: 4px; border: 1px solid #ddd; }
+        button { font-size: 16px; padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
-        #chart-container { margin-top: 30px; }
-        #results-table { margin-top: 30px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+        .chart-container { width: 95%; height: 500px; margin: 30px auto; }
+        .table-container { flex-grow: 1; }
+        h2 { color: #444; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
         th { background-color: #f2f2f2; }
+        .error { text-align: center; color: #D8000C; background-color: #FFD2D2; padding: 10px; border-radius: 4px; margin-top: 20px;}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>台灣股市走勢預測</h1>
-        <form action="/predict" method="get">
-            <input type="text" name="stock_code" placeholder="請輸入股票代碼 (例如: 2330)" value="{{ stock_code or '' }}">
-            <button type="submit">查詢</button>
+        <h1>台灣市值百大個股預測</h1>
+
+        <form action="/" method="get">
+            <select name="stock_code" required>
+                <option value="">請選擇一支股票</option>
+                {% for stock in stock_list %}
+                    <option value="{{ stock.公司代號 }}" {% if stock.公司代號 == stock_code %}selected{% endif %}>
+                        {{ stock.公司代號 }} - {{ stock.公司簡稱 }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit">開始預測</button>
         </form>
 
-        {% if historical_data and forecast_data %}
-        <div id="chart-container">
-            <canvas id="stockChart"></canvas>
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if stock_code and historical_data and forecast_data %}
+        <div class="chart-container">
+            <h2>{{ stock_code }} - {{ stock_name }} 走勢與預測</h2>
+            <canvas id="predictionChart"></canvas>
         </div>
 
-        <div id="results-table">
+        <div class="table-container">
             <h2>預測結果 (未來30日)</h2>
             <table>
                 <thead>
@@ -57,93 +72,73 @@
 
     <script>
     {% if stock_code and historical_data and forecast_data %}
-        // 只有在後端傳遞了有效資料時，才渲染這段 JavaScript
-
         const historicalData = {{ historical_data | tojson }};
         const forecastData = {{ forecast_data | tojson }};
         const stockCode = {{ stock_code | tojson }};
 
-        const ctx = document.getElementById('stockChart').getContext('2d');
+        const ctx = document.getElementById('predictionChart').getContext('2d');
 
-        // 準備圖表標籤 (X 軸 - 日期)
         const historyLabels = historicalData.map(item => item.Date);
-            const forecastLabels = forecastData.map(item => item.Date);
-            const allLabels = [...historyLabels, ...forecastLabels];
+        const forecastLabels = forecastData.map(item => item.Date);
+        const allLabels = [...historyLabels, ...forecastLabels];
 
-            // 準備圖表數據 (Y 軸 - 價格)
-            const historyPrices = historicalData.map(item => item.ClosingPrice);
-            // 為了讓兩條線能正確銜接，歷史數據的最後一點也要放在預測數據的第一點
-            const forecastPrices = [historyPrices[historyPrices.length - 1], ...forecastData.map(item => item.PredictedPrice)];
+        const historyPrices = historicalData.map(item => item.ClosingPrice);
+        const forecastPrices = [historyPrices[historyPrices.length - 1], ...forecastData.map(item => item.PredictedPrice)];
+        const paddedForecastPrices = new Array(historyLabels.length - 1).fill(null).concat(forecastPrices);
 
-            // 為了讓圖表的預測線段前面是空白的，我們用 null 來填充
-            const paddedForecastPrices = new Array(historyLabels.length - 1).fill(null).concat(forecastPrices);
-
-
-            const chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: allLabels,
-                    datasets: [
-                        {
-                            label: `股票 ${stockCode} - 歷史收盤價`,
-                            data: historyPrices,
-                            borderColor: 'rgba(0, 123, 255, 1)',
-                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                            borderWidth: 2,
-                            pointRadius: 1,
-                            fill: true,
-                        },
-                        {
-                            label: '預測收盤價',
-                            data: paddedForecastPrices,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                            borderWidth: 2,
-                            pointRadius: 2,
-                            borderDash: [5, 5], // 虛線樣式
-                            fill: true,
-                        }
-                    ]
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allLabels,
+                datasets: [
+                    {
+                        label: `歷史收盤價`,
+                        data: historyPrices,
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 1.5,
+                        fill: true,
+                    },
+                    {
+                        label: '預測收盤價',
+                        data: paddedForecastPrices,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        borderDash: [5, 5],
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: '日期'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: '收盤價 (TWD)'
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        label += new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD' }).format(context.parsed.y);
-                                    }
-                                    return label;
+                scales: {
+                    x: { title: { display: true, text: '日期' } },
+                    y: { title: { display: true, text: '收盤價 (TWD)' } }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD' }).format(context.parsed.y);
                                 }
+                                return label;
                             }
                         }
                     }
                 }
-            });
+            }
+        });
     {% endif %}
     </script>
 </body>

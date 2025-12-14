@@ -17,11 +17,11 @@ def create_features(df):
     df['MA21'] = df['ClosingPrice'].rolling(window=21).mean()
     df['MA_diff'] = df['MA7'] - df['MA21']
 
-    # RSI (相对强弱指数)
+    # RSI (相对强弱指数) - 增加數值穩定性
     delta = df['ClosingPrice'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
+    rs = gain / (loss + 1e-10) # 加上一個極小值以避免除以零
     df['RSI'] = 100 - (100 / (1 + rs))
 
     # 建立延遲特徵
@@ -40,15 +40,20 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
-        # 建立特徵
+        # 建立特徵並用 bfill 處理 NaN 值以保留資料點
         features_df = create_features(data)
-        features_df.dropna(inplace=True)
+        features_df.fillna(method='bfill', inplace=True)
+        features_df.dropna(inplace=True) # 確保在 bfill 後仍然沒有 NaN
 
         FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]
         TARGET = 'ClosingPrice'
 
         X = features_df[FEATURES]
         y = features_df[TARGET]
+
+        if X.empty or y.empty:
+            print("After feature creation and cleaning, the dataset is empty. Cannot train model.")
+            return None
 
         # 訓練模型
         reg = xgb.XGBRegressor(n_estimators=1000, early_stopping_rounds=50,
@@ -96,8 +101,9 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
-        # 建立特徵
+        # 建立特徵並用 bfill 處理 NaN 值
         features_df = create_features(data)
+        features_df.fillna(method='bfill', inplace=True)
         features_df.dropna(inplace=True)
 
         FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]
@@ -105,6 +111,10 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
 
         X = features_df[FEATURES]
         y = features_df[TARGET]
+
+        if X.empty or y.empty or len(X) < test_days:
+            print("After feature creation, the dataset is too small to backtest. Skipping.")
+            return None
 
         # 分割資料
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_days, shuffle=False)

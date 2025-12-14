@@ -1,66 +1,75 @@
-from flask import Flask, request, render_template, jsonify
-from src.data_fetcher import get_historical_data_for_stocks, get_daily_stock_data
-from src.model import train_and_predict
+from flask import Flask, request, render_template
+from data_fetcher import get_historical_data, get_top_100_stocks
+from model import train_and_predict
 import pandas as pd
-from datetime import datetime, timedelta
 
 app = Flask(__name__, template_folder='../templates')
 
-@app.route('/predict', methods=['GET'])
-def predict():
+@app.route('/', methods=['GET'])
+def index():
+    """
+    渲染主頁面，處理股票預測請求，並提供市值百大公司列表。
+    """
     stock_code = request.args.get('stock_code')
 
-    # 如果沒有提供股票代碼，只顯示頁面，並傳遞空值
+    # 取得百大公司列表用於下拉選單
+    top_100 = get_top_100_stocks()
+    stock_list = []
+    if top_100 is not None and not top_100.empty:
+        stock_list = top_100[['公司代號', '公司簡稱']].to_dict('records')
+
+    # 如果沒有輸入股票代號，只顯示主頁面
     if not stock_code:
-        return render_template('index.html',
-                               stock_code=None,
-                               historical_data=None,
-                               forecast_data=None)
+        return render_template('index.html', stock_list=stock_list)
 
+    # 如果有股票代號，則執行預測
     try:
-        # 1. 找到最後一個交易日
-        last_trading_day_prices = None
-        last_trading_date = datetime.today()
-        days_to_check = 0
-        while last_trading_day_prices is None or last_trading_day_prices.empty:
-            last_trading_date = datetime.today() - timedelta(days=days_to_check)
-            last_trading_day_prices = get_daily_stock_data(last_trading_date.strftime('%Y%m%d'))
-            days_to_check += 1
-            if days_to_check > 10:
-                return render_template('index.html', error="錯誤：過去 10 天內都找不到交易資料。")
-
-        # 2. 獲取歷史資料
         print(f"正在為 {stock_code} 獲取歷史資料...")
-        history_df = get_historical_data_for_stocks([stock_code], days=120, end_date=last_trading_date)
-        if history_df is None or history_df.empty:
-            return render_template('index.html', error=f"找不到 {stock_code} 的歷史資料。")
+        # 獲取約一年的歷史資料用於特徵工程
+        history_df = get_historical_data([stock_code], period="1y")
 
-        # 2. 訓練模型並預測
+        if history_df is None or history_df.empty:
+            error_msg = f"找不到 {stock_code} 的歷史資料。請確認股票代號是否正確。"
+            return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
+
         print(f"正在為 {stock_code} 進行模型訓練與預測...")
         forecast_df = train_and_predict(history_df, forecast_days=30)
-        if forecast_df is None:
-            return render_template('index.html', error=f"為 {stock_code} 進行預測時發生錯誤。")
 
-        # 3. 準備要傳遞給前端的資料
-        # 將 DataFrame 轉換為字典列表
-        historical_data = history_df.to_dict('records')
+        if forecast_df is None:
+            error_msg = f"為 {stock_code} 進行預測時發生錯誤。可能是資料不足或模型無法收斂。"
+            return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
+
+        # 準備圖表資料 (最近90天歷史 + 30天預測)
+        history_df_chart = history_df.tail(90)
+        historical_data = history_df_chart.to_dict('records')
         forecast_data = forecast_df.to_dict('records')
 
-        # 格式化日期以便 JavaScript 處理
+        # 格式化日期
         for item in historical_data:
             item['Date'] = item['Date'].strftime('%Y-%m-%d')
         for item in forecast_data:
             item['Date'] = item['Date'].strftime('%Y-%m-%d')
 
+        # 取得公司名稱用於顯示
+        stock_name = ""
+        if stock_list:
+            match = next((item for item in stock_list if item['公司代號'] == stock_code), None)
+            if match:
+                stock_name = match['公司簡稱']
+
         print("預測完成，渲染結果頁面。")
         return render_template('index.html',
                                stock_code=stock_code,
+                               stock_name=stock_name,
                                historical_data=historical_data,
-                               forecast_data=forecast_data)
+                               forecast_data=forecast_data,
+                               stock_list=stock_list)
 
     except Exception as e:
         print(f"處理請求時發生未預期的錯誤: {e}")
-        return render_template('index.html', error=f"處理請求時發生未預期的錯誤: {str(e)}")
+        error_msg = f"處理您的請求時發生未預期的錯誤: {str(e)}"
+        return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # 使用 debug=True 以便於開發
+    app.run(host='0.0.0.0', port=8080, debug=True)
