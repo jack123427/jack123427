@@ -24,3 +24,4 @@ tzdata
 urllib3
 Werkzeug
 yfinance
+xgboost

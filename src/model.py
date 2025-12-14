@@ -40,9 +40,12 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
+        # 重新取樣為每日頻率，並使用時間插值法填補缺失值 (例如假日)
+        data = data.resample('D').interpolate(method='time')
+
         # 建立特徵並用 bfill 處理 NaN 值以保留資料點
         features_df = create_features(data)
-        features_df.fillna(method='bfill', inplace=True)
+        features_df.bfill(inplace=True)
         features_df.dropna(inplace=True) # 確保在 bfill 後仍然沒有 NaN
 
         FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]
@@ -101,9 +104,12 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
+        # 重新取樣為每日頻率，並使用時間插值法填補缺失值
+        data = data.resample('D').interpolate(method='time')
+
         # 建立特徵並用 bfill 處理 NaN 值
         features_df = create_features(data)
-        features_df.fillna(method='bfill', inplace=True)
+        features_df.bfill(inplace=True)
         features_df.dropna(inplace=True)
 
         FEATURES = ['MA7', 'MA21', 'MA_diff', 'RSI'] + [f'lag_{i}' for i in range(1, 6)]

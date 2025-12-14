@@ -1,194 +1,79 @@
-# 台灣股市預測專案 (Proof of Concept)
+# 台灣市值百大個股預測 Web App
 
-這是一個使用台灣證券交易所 (TWSE) 的公開 API 來預測台灣股市走向的概念性驗證專案。
+這是一個 Flask Web 應用程式，旨在預測台灣市值百大上市公司的股價走勢。使用者可以從下拉式選單中選擇一支股票，應用程式將使用 XGBoost 模型進行訓練，並在網頁上以互動式圖表和表格呈現未來 30 天的股價預測。
 
-## 專案功能
+## 專案特色
 
-*   **資料擷取**: 從 TWSE OpenAPI 獲取上市公司的基本資料、每日股價、財務報表、本益比、股價淨值比、融資融券等資料。
-*   **市值計算**: 計算所有上市公司的市值，並篩選出市值前一百大的公司。
-*   **模型訓練與預測**: 使用 XGBoost 模型，結合時間序列特徵和延遲特徵，對指定股票的未來 10 天收盤價進行預測。
-*   **模型回測**: 提供一個簡單的回測機制，使用平均絕對百分比誤差 (MAPE) 來評估模型的準確度。
-*   **API 服務**: 提供一個基於 Flask 的 API 服務，讓使用者可以透過 HTTP 請求來獲取指定股票的預測結果。
+*   **Web 使用者介面**: 使用 Flask 和 Chart.js 打造，提供一個簡單直觀的介面來選擇股票並查看預測結果。
+*   **動態市值排名**: 應用程式會自動從台灣證券交易所 (TWSE) 獲取最新的公司資料和股價，計算出最新的市值百大公司列表，並呈現在下拉選單中。
+*   **可靠的歷史資料**: 使用 `yfinance` 套件獲取穩定且準確的每日歷史股價資料，作為模型訓練的基礎。
+*   **機器學習模型**: 採用 XGBoost 模型，並透過特徵工程 (如移動平均線、RSI) 來捕捉股價的時間序列特性。
+*   **視覺化圖表**: 將歷史股價與預測股價合併呈現在一張互動式圖表中，讓使用者可以清楚地看到趨勢變化。
 
-## 檔案結構與功能
+## 檔案結構
 
 ```
 .
 ├── src
-│   ├── data_fetcher.py   # 負責從 TWSE API 獲取所有需要的資料。
-│   ├── model.py          # 包含了 XGBoost 模型的訓練、預測與回測邏輯。
-│   ├── app.py            # Flask API 服務，提供 /predict 端點。
-│   └── main.py           # 主要的執行腳本，串連所有功能，對市值前五大公司進行分析。
+│   ├── data_fetcher.py   # 負責從 TWSE API 和 yfinance 獲取資料。
+│   ├── model.py          # 包含 XGBoost 模型的特徵工程、訓練和預測邏輯。
+│   └── app.py            # Flask Web 應用程式的主要進入點。
+├── templates
+│   └── index.html        # Web 介面的 HTML 模板。
 ├── tests
 │   ├── test_data_fetcher.py # data_fetcher.py 的單元測試。
 │   └── test_model.py     # model.py 的單元測試。
-├── .gitignore            # 忽略不需要加入版本控制的檔案。
-└── requirements.txt      # 專案所需的核心 Python 相依套件。
+├── .gitignore
+└── requirements.txt      # 專案所需的 Python 相依套件。
 ```
 
 ## 安裝與執行
 
 ### 1. 環境準備
 
-強烈建議使用 [Anaconda](https://www.anaconda.com/products/distribution) 來管理您的 Python 環境，這可以大幅簡化安裝 `xgboost` GPU 版本的流程。
+*   建議使用 Python 3.9 或更新的版本。
+*   建議在虛擬環境中安裝，以避免套件版本衝突。
 
-建議使用 Python 3.8 或更新的版本。
+    ```bash
+    # 建立虛擬環境
+    python -m venv venv
+
+    # 啟用虛擬環境 (macOS/Linux)
+    source venv/bin/activate
+
+    # 啟用虛擬環境 (Windows)
+    .\venv\Scripts\activate
+    ```
 
 ### 2. 安裝相依套件
 
-#### a) 使用 Anaconda (建議)
-
-1.  **建立新的 conda 環境**：
-    ```bash
-    conda create --name stock-prediction python=3.9
-    conda activate stock-prediction
-    ```
-2.  **安裝核心套件**：
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  **安裝 XGBoost** (二選一)：
-    *   **CPU 版本**:
-        ```bash
-        conda install -c conda-forge xgboost
-        ```
-    *   **GPU 版本**: `conda` 會自動處理 CUDA toolkit 的相依性，是目前最建議的 GPU 版本安裝方式。
-        ```bash
-        conda install -c conda-forge py-xgboost-gpu
-        ```
-
-#### b) 使用 pip (不建議用於 GPU 版本)
-
-如果您不使用 Anaconda，您也可以使用 `pip` 來安裝。
+直接使用 `pip` 安裝 `requirements.txt` 中的所有套件。
 
 ```bash
-# 步驟 1: 安裝核心套件
 pip install -r requirements.txt
-
-# 步驟 2: 安裝 XGBoost (CPU 版本)
-pip install xgboost
 ```
 
-### 3. 執行方式
+### 3. 啟動 Web 應用程式
 
-#### a) 執行主要分析流程
-
-您可以直接執行 `main.py` 來啟動對市值前五大公司的完整分析流程 (資料獲取 -> 訓練 -> 回測 -> 預測)。
+在專案的根目錄下，執行以下指令來啟動 Flask 伺服器：
 
 ```bash
-# Linux / macOS
-export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-python3 src/main.py
-
-# Windows PowerShell
-$env:PYTHONPATH += ";$(pwd)/src"
-python3 src/main.py
+python src/app.py
 ```
 
-#### b) 啟動 API 服務
+伺服器啟動後，您會看到類似以下的訊息：
+`* Running on http://127.0.0.1:8080`
 
-1.  **在您的終端機中，啟動伺服器**：
-    ```bash
-    # Linux / macOS
-    export PYTHONPATH=$PYTHONPATH:$(pwd)/src
-    python3 src/app.py
+### 4. 開啟瀏覽器
 
-    # Windows PowerShell
-    $env:PYTHONPATH += ";$(pwd)/src"
-    python3 src/app.py
-    ```
-    伺服器啟動後，您會看到類似 `* Running on http://127.0.0.1:5000/` 的訊息。
+打開您的網頁瀏覽器，並訪問以下網址：
 
-    > **[!!] 重要提示**
-    >
-    > 請保持這個終端機視窗**開啟**，不要關閉。伺服器需要在背景持續運行。
+[http://127.0.0.1:8080](http://127.0.0.1:8080)
 
-2.  **另外開啟一個全新的終端機視窗**，然後在新視窗中輸入以下指令來測試 API。
+現在，您可以從下拉選單中選擇一支股票，點擊「開始預測」，然後等待模型計算完成後，頁面上就會顯示預測的圖表和結果。
 
-    例如，要預測台積電 (2330) 的股價：
-    ```bash
-    # 通用指令
-    curl "http://127.0.0.1:5000/predict?stock_code=2330"
+## 注意事項
 
-    # 如果您在 Windows PowerShell 中遇到 curl 的問題，也可以使用 Invoke-WebRequest
-    Invoke-WebRequest -Uri "http://127.0.0.1:5000/predict?stock_code=2330"
-    ```
-
-## Visual Studio Code (VSCode) 使用者指南
-
-1.  **選擇 Python 直譯器**：
-    *   打開 VSCode 的命令面板 (View -> Command Palette... 或 `Ctrl+Shift+P`)。
-    *   輸入 "Python: Select Interpreter"。
-    *   選擇您希望使用的 Python 環境 (例如，您用 Anaconda 建立的 `stock-prediction` 環境)。
-2.  **設定 `launch.json` 以方便偵錯**：
-    *   切換到 "Run and Debug" 分頁。
-    *   點擊 "create a launch.json file"，並選擇 "Python"。
-    *   VSCode 會產生一個 `launch.json` 檔案。將其內容修改如下，主要是加入了 `"env": {"PYTHONPATH": "${workspaceFolder}/src"}` 這個設定，這樣 VSCode 在偵錯時才能正確地找到 `src` 目錄下的模組。
-    ```json
-    {
-        "version": "0.2.0",
-        "configurations": [
-            {
-                "name": "Python: Main",
-                "type": "python",
-                "request": "launch",
-                "program": "${workspaceFolder}/src/main.py",
-                "console": "integratedTerminal",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}/src"
-                }
-            },
-            {
-                "name": "Python: Flask API",
-                "type": "python",
-                "request": "launch",
-                "module": "flask",
-                "env": {
-                    "FLASK_APP": "src/app.py",
-                    "PYTHONPATH": "${workspaceFolder}/src"
-                },
-                "args": [
-                    "run",
-                    "--no-debugger"
-                ],
-                "jinja": true
-            }
-        ]
-    }
-    ```
-3.  **開始偵錯**：
-    *   現在您可以在 "Run and Debug" 分頁的下拉選單中，選擇 "Python: Main" 來執行 `main.py`，或選擇 "Python: Flask API" 來啟動 API 伺服器，並可以設定中斷點進行偵錯。
-
-## 疑難排解 (Troubleshooting)
-
-### XGBoost: `Mismatched version` 錯誤
-
-如果您在執行時遇到類似以下的錯誤訊息：
-`ValueError: Mismatched version between the Python package and the native shared object.`
-
-這通常是因為您的環境中同時存在透過 `pip` 和 `conda` 安裝的 `xgboost` 版本，導致了衝突。
-
-**解決方案**：請徹底移除所有 `xgboost` 版本，然後使用 `conda` 重新安裝一個乾淨的版本。
-
-1.  **啟動您的 conda 環境**：
-    ```bash
-    conda activate stock-prediction
-    ```
-
-2.  **徹底解除安裝** (重複執行直到確認沒有任何版本殘留)：
-    ```bash
-    pip uninstall xgboost -y
-    conda remove xgboost -y
-    ```
-    您可能需要重複執行 `pip uninstall` 幾次，以確保所有 pip 安裝的版本都被移除。
-
-3.  **使用 conda 重新安裝**：
-    ```bash
-    conda install -c conda-forge xgboost
-    ```
-    或者，如果您要安裝 GPU 版本：
-    ```bash
-    conda install -c conda-forge py-xgboost-gpu
-    ```
-
-這樣應該可以解決版本衝突的問題。
+*   **首次載入**: 第一次啟動或選擇股票時，應用程式需要時間去下載市值列表和歷史資料，請耐心等候。
+*   **模型限制**: 本專案僅為概念性驗證，預測結果僅供參考，不構成任何投資建議。
+*   **資料延遲**: 證交所的 API 可能會有資料更新的延遲，因此當日的市值排名可能不是完全即時的。
