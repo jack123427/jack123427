@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import yfinance as yf
+import time
 
 def get_listed_companies():
     """
@@ -132,3 +133,82 @@ def get_historical_data(stock_codes, period="1y"):
         return df[present_cols]
 
     return df[required_cols]
+
+def fetch_institutional_trading(days=365):
+    """Fetches institutional trading data for the last N days."""
+    all_data = []
+    today = datetime.today()
+    for i in range(days):
+        date = today - timedelta(days=i)
+        date_str = date.strftime('%Y%m%d')
+        url = f"https://www.twse.com.tw/fund/T86?response=json&date={date_str}&selectType=ALL"
+        try:
+            # TWSE requires a specific user-agent
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            content = response.json()
+            if content.get('stat') != 'OK' or 'data' not in content:
+                continue
+
+            df = pd.DataFrame(content['data'], columns=content['fields'])
+            df['date'] = date
+            all_data.append(df)
+            time.sleep(0.1) # Be respectful to the API
+        except (requests.exceptions.RequestException, KeyError, ValueError) as e:
+            print(f"Failed to fetch institutional data for {date_str}: {e}")
+            continue
+
+    if not all_data:
+        return pd.DataFrame()
+
+    final_df = pd.concat(all_data, ignore_index=True)
+    # Standardize column names
+    final_df.rename(columns={'證券代號': '公司代號', '外陸資買賣超股數(不含外資自營商)': 'Foreign_Net_Buy_Sell',
+                             '投信買賣超股數': 'Investment_Trust_Net_Buy_Sell',
+                             '自營商買賣超股數': 'Dealer_Net_Buy_Sell',
+                             '三大法人買賣超股數': 'Total_Net_Buy_Sell'}, inplace=True)
+
+    # Convert numbers to numeric, removing commas
+    for col in ['Foreign_Net_Buy_Sell', 'Investment_Trust_Net_Buy_Sell', 'Dealer_Net_Buy_Sell', 'Total_Net_Buy_Sell']:
+        final_df[col] = pd.to_numeric(final_df[col].str.replace(',', ''), errors='coerce')
+
+    return final_df[['date', '公司代號', 'Foreign_Net_Buy_Sell', 'Investment_Trust_Net_Buy_Sell', 'Dealer_Net_Buy_Sell', 'Total_Net_Buy_Sell']]
+
+def fetch_margin_trading(days=365):
+    """Fetches margin trading data for the last N days."""
+    all_data = []
+    today = datetime.today()
+    for i in range(days):
+        date = today - timedelta(days=i)
+        date_str = date.strftime('%Y%m%d')
+        url = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={date_str}&selectType=ALL"
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            content = response.json()
+            if content.get('stat') != 'OK' or 'data' not in content:
+                continue
+
+            df = pd.DataFrame(content['data'], columns=content['fields'])
+            df['date'] = date
+            all_data.append(df)
+            time.sleep(0.1)
+        except (requests.exceptions.RequestException, KeyError, ValueError) as e:
+            print(f"Failed to fetch margin data for {date_str}: {e}")
+            continue
+
+    if not all_data:
+        return pd.DataFrame()
+
+    final_df = pd.concat(all_data, ignore_index=True)
+    final_df.rename(columns={'股票代號': '公司代號', '融資買進': 'Margin_Buy', '融資賣出': 'Margin_Sell',
+                             '融資餘額': 'Margin_Balance', '融券賣出': 'Short_Sell', '融券買進': 'Short_Cover',
+                             '融券餘額': 'Short_Balance'}, inplace=True)
+
+    cols_to_convert = ['Margin_Buy', 'Margin_Sell', 'Margin_Balance', 'Short_Sell', 'Short_Cover', 'Short_Balance']
+    for col in cols_to_convert:
+        final_df[col] = pd.to_numeric(final_df[col].str.replace(',', ''), errors='coerce')
+
+    return final_df[['date', '公司代號'] + cols_to_convert]

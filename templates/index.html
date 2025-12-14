@@ -14,7 +14,8 @@
         button { font-size: 16px; padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
         .chart-container { width: 95%; height: 500px; margin: 30px auto; }
-        .table-container { flex-grow: 1; }
+        .tables-wrapper { display: flex; gap: 20px; justify-content: center; }
+        .table-container { flex-basis: 45%; }
         h2 { color: #444; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
@@ -48,24 +49,48 @@
             <canvas id="predictionChart"></canvas>
         </div>
 
-        <div class="table-container">
-            <h2>預測結果 (未來30日)</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>日期</th>
-                        <th>預測收盤價</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in forecast_data %}
-                    <tr>
-                        <td>{{ item.Date }}</td>
-                        <td>{{ "%.2f"|format(item.PredictedPrice) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="tables-wrapper">
+            <div class="table-container">
+                <h2>預測結果 (未來30日)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>預測收盤價</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in forecast_data %}
+                        <tr>
+                            <td>{{ item.Date }}</td>
+                            <td>{{ "%.2f"|format(item.PredictedPrice) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if features %}
+            <div class="table-container">
+                <h2>模型輸入參數</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>參數名稱</th>
+                            <th>數值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, value in features.items() %}
+                        <tr>
+                            <td>{{ key }}</td>
+                            <td>{{ "%.4f"|format(value) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
     </div>

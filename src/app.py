@@ -33,7 +33,7 @@ def index():
             return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
 
         print(f"正在為 {stock_code} 進行模型訓練與預測...")
-        forecast_df = train_and_predict(history_df, forecast_days=30)
+        forecast_df, latest_features = train_and_predict(history_df, forecast_days=30)
 
         if forecast_df is None:
             error_msg = f"為 {stock_code} 進行預測時發生錯誤。可能是資料不足或模型無法收斂。"
@@ -63,7 +63,8 @@ def index():
                                stock_name=stock_name,
                                historical_data=historical_data,
                                forecast_data=forecast_data,
-                               stock_list=stock_list)
+                               stock_list=stock_list,
+                               features=latest_features)
 
     except Exception as e:
         print(f"處理請求時發生未預期的錯誤: {e}")

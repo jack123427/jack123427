@@ -15,11 +15,16 @@ class TestModel(unittest.TestCase):
         # 建立一個通用的假歷史資料，長度增加到 50 以滿足特徵計算的需求
         dates = pd.to_datetime(pd.date_range(start="2024-01-01", periods=50))
         prices = pd.Series([100 + i for i in range(50)])
-        self.sample_history = pd.DataFrame({'Date': dates, 'ClosingPrice': prices})
+        self.sample_history = pd.DataFrame({
+            'Date': dates,
+            'ClosingPrice': prices,
+            '公司代號': '2330' # 新增公司代號
+        })
 
     def test_train_and_predict(self):
-        forecast_df = train_and_predict(self.sample_history, forecast_days=5)
+        forecast_df, latest_features = train_and_predict(self.sample_history, forecast_days=5)
         self.assertIsNotNone(forecast_df)
+        self.assertIsNotNone(latest_features)
         self.assertEqual(len(forecast_df), 5)
         self.assertIn('PredictedPrice', forecast_df.columns)
 
