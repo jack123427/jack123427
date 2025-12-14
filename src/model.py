@@ -37,6 +37,9 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     if historical_data is None or len(historical_data) < 30: # 需要更多資料來計算特徵
         return None
 
+    # 清理無效日期
+    historical_data.dropna(subset=['Date'], inplace=True)
+
     try:
         data = historical_data.sort_values('Date').set_index('Date')
 
@@ -100,6 +103,9 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
     """
     if historical_data is None or len(historical_data) < (test_days + 30):
         return None
+
+    # 清理無效日期
+    historical_data.dropna(subset=['Date'], inplace=True)
 
     try:
         data = historical_data.sort_values('Date').set_index('Date')
