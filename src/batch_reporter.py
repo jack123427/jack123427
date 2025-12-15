@@ -6,8 +6,8 @@ import os
 from datetime import datetime
 import io
 
-from data_fetcher import get_top_100_stocks, get_historical_data
-from model import train_and_predict
+from .data_fetcher import get_top_100_stocks, get_historical_data
+from .model import train_and_predict
 
 def create_prediction_chart(historical_df, forecast_df, stock_code, stock_name):
     """
