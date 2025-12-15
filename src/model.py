@@ -3,7 +3,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.model_selection import train_test_split
 import warnings
-from data_fetcher import fetch_institutional_trading, fetch_margin_trading
+from .data_fetcher import fetch_institutional_trading, fetch_margin_trading
 
 warnings.filterwarnings("ignore")
 
@@ -72,9 +72,14 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     stock_code = historical_data['公司代號'].iloc[0]
 
     try:
+        # Define date range for fetching chip data
+        end_date = historical_data['Date'].max()
+        start_date = historical_data['Date'].min()
+
         # Fetch new data
-        institutional_df = fetch_institutional_trading(days=len(historical_data) + 50)
-        margin_df = fetch_margin_trading(days=len(historical_data) + 50)
+        print(f"Fetching institutional and margin data from {start_date} to {end_date}...")
+        institutional_df = fetch_institutional_trading(start_date, end_date)
+        margin_df = fetch_margin_trading(start_date, end_date)
 
         # Filter for the specific stock
         # Create features
@@ -98,23 +103,31 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
         reg.fit(X, y, eval_set=[(X, y)], verbose=False)
 
         # Iterative forecasting
+        print("Starting iterative forecasting...")
         predictions = []
-        current_features = features_df.iloc[-1:].copy()
+        # Start with the full historical data for feature creation
+        future_df = historical_data.copy()
 
-        for _ in range(forecast_days):
-            pred = reg.predict(current_features[FEATURES])[0]
+        for i in range(forecast_days):
+            # 1. Create features for the current dataset
+            features_for_pred = create_features(future_df, institutional_df, margin_df, stock_code)
+            features_for_pred.bfill(inplace=True)
+            features_for_pred.dropna(inplace=True)
+
+            # 2. Predict the next step using the last row of features
+            last_features = features_for_pred.iloc[-1:][FEATURES]
+            pred = reg.predict(last_features)[0]
             predictions.append(pred)
 
-            # Update the features for the next prediction
-            new_row = current_features.iloc[[-1]].copy()
-            new_row['ClosingPrice'] = pred
-            # Recalculate features that depend on the last price
-            # This is a simplified approach; a more complex model would recalculate all features
-            for i in range(5, 1, -1):
-                new_row[f'lag_{i}'] = new_row[f'lag_{i-1}']
-            new_row['lag_1'] = current_features['ClosingPrice'].iloc[-1]
-
-            current_features = pd.concat([current_features, new_row])
+            # 3. Create a new row for the next day and append it
+            last_date = future_df['Date'].iloc[-1]
+            new_row = pd.DataFrame({
+                'Date': [last_date + pd.Timedelta(days=1)],
+                'ClosingPrice': [pred],
+                '公司代號': [stock_code]
+            })
+            future_df = pd.concat([future_df, new_row], ignore_index=True)
+        print("Iterative forecasting complete.")
 
 
         future_dates = pd.date_range(start=historical_data['Date'].iloc[-1] + pd.Timedelta(days=1), periods=forecast_days)

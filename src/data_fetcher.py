@@ -134,27 +134,31 @@ def get_historical_data(stock_codes, period="1y"):
 
     return df[required_cols]
 
-def fetch_institutional_trading(days=365):
-    """Fetches institutional trading data for the last N days."""
+def fetch_institutional_trading(start_date, end_date):
+    """
+    Fetches institutional trading data month by month between two dates.
+    """
     all_data = []
-    today = datetime.today()
-    for i in range(days):
-        date = today - timedelta(days=i)
+    # Create a range of dates for the first of each month
+    date_range = pd.date_range(start=start_date, end=end_date, freq='MS')
+
+    for date in date_range:
         date_str = date.strftime('%Y%m%d')
         url = f"https://www.twse.com.tw/fund/T86?response=json&date={date_str}&selectType=ALL"
         try:
-            # TWSE requires a specific user-agent
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
-            response = requests.get(url, headers=headers, timeout=15)
+            response = requests.get(url, headers=headers, timeout=30) # Increased timeout
             response.raise_for_status()
             content = response.json()
+
             if content.get('stat') != 'OK' or 'data' not in content:
+                print(f"No institutional data for {date.strftime('%Y-%m')}")
                 continue
 
             df = pd.DataFrame(content['data'], columns=content['fields'])
-            df['date'] = date
+            df['date'] = pd.to_datetime(date.strftime('%Y-%m') + '-' + df['證券代號'].str.extract(r'(\d+)')[0], errors='coerce') # Approximate date
             all_data.append(df)
-            time.sleep(0.1) # Be respectful to the API
+            time.sleep(2) # Be respectful to the API
         except (requests.exceptions.RequestException, KeyError, ValueError) as e:
             print(f"Failed to fetch institutional data for {date_str}: {e}")
             continue
@@ -175,26 +179,29 @@ def fetch_institutional_trading(days=365):
 
     return final_df[['date', '公司代號', 'Foreign_Net_Buy_Sell', 'Investment_Trust_Net_Buy_Sell', 'Dealer_Net_Buy_Sell', 'Total_Net_Buy_Sell']]
 
-def fetch_margin_trading(days=365):
-    """Fetches margin trading data for the last N days."""
+def fetch_margin_trading(start_date, end_date):
+    """
+    Fetches margin trading data month by month between two dates.
+    """
     all_data = []
-    today = datetime.today()
-    for i in range(days):
-        date = today - timedelta(days=i)
+    date_range = pd.date_range(start=start_date, end=end_date, freq='MS')
+
+    for date in date_range:
         date_str = date.strftime('%Y%m%d')
         url = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={date_str}&selectType=ALL"
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
-            response = requests.get(url, headers=headers, timeout=15)
+            response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
             content = response.json()
             if content.get('stat') != 'OK' or 'data' not in content:
+                print(f"No margin data for {date.strftime('%Y-%m')}")
                 continue
 
             df = pd.DataFrame(content['data'], columns=content['fields'])
-            df['date'] = date
+            df['date'] = pd.to_datetime(date.strftime('%Y-%m') + '-' + df['股票代號'].str.extract(r'(\d+)')[0], errors='coerce')
             all_data.append(df)
-            time.sleep(0.1)
+            time.sleep(2)
         except (requests.exceptions.RequestException, KeyError, ValueError) as e:
             print(f"Failed to fetch margin data for {date_str}: {e}")
             continue

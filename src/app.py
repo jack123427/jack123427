@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template
-from data_fetcher import get_historical_data, get_top_100_stocks
-from model import train_and_predict
+from .data_fetcher import get_historical_data, get_top_100_stocks
+from .model import train_and_predict
 import pandas as pd
 
 app = Flask(__name__, template_folder='../templates')

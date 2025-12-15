@@ -4,10 +4,10 @@ from datetime import datetime
 import sys
 import os
 
-# 將 src 目錄加入 sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+# 將專案根目錄加入 sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from model import train_and_predict, backtest_model
+from src.model import train_and_predict, backtest_model
 
 class TestModel(unittest.TestCase):
 
