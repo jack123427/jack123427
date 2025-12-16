@@ -65,10 +65,12 @@ pip install python-docx matplotlib
 在專案的根目錄下，執行以下指令：
 
 ```bash
-python src/app.py
+python -m flask --app src.app run --port 8080
 ```
 
 然後打開您的網頁瀏覽器，並訪問 [http://127.0.0.1:8080](http://127.0.0.1:8080)。
+
+**注意**: 必須使用此指令來執行，這能確保 Python 直譯器將 `src` 目錄視為一個套件，從而正確處理模組之間的相對引用。
 
 #### b) 產生批次預測報告
 
