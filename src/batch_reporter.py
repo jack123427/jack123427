@@ -1,13 +1,22 @@
+import os
+import sys
+
+# Add the project root to the Python path
+# This allows the script to be run directly, as well as as a module
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+if os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') not in sys.path:
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
 import pandas as pd
 from docx import Document
 from docx.shared import Inches
 import matplotlib.pyplot as plt
-import os
 from datetime import datetime
 import io
 
-from .data_fetcher import get_top_100_stocks, get_historical_data
-from .model import train_and_predict
+from src.data_fetcher import get_top_100_stocks, get_historical_data
+from src.model import train_and_predict
 
 def create_prediction_chart(historical_df, forecast_df, stock_code, stock_name):
     """

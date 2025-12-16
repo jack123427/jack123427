@@ -3,7 +3,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.model_selection import train_test_split
 import warnings
-from .data_fetcher import fetch_institutional_trading, fetch_margin_trading
+from src.data_fetcher import fetch_institutional_trading, fetch_margin_trading
 
 warnings.filterwarnings("ignore")
 

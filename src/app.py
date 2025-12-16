@@ -1,6 +1,16 @@
+import os
+import sys
+
+# Add the project root to the Python path
+# This allows the script to be run directly, as well as as a module
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+if os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') not in sys.path:
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
 from flask import Flask, request, render_template
-from .data_fetcher import get_historical_data, get_top_100_stocks
-from .model import train_and_predict
+from src.data_fetcher import get_historical_data, get_top_100_stocks
+from src.model import train_and_predict
 import pandas as pd
 
 app = Flask(__name__, template_folder='../templates')
