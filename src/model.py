@@ -196,3 +196,33 @@ def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
     # Returning a dummy value to avoid breaking the app.
     print("Backtesting not implemented with new features yet.")
     return 0.5
+
+from prophet import Prophet
+
+def train_and_predict_prophet(historical_data: pd.DataFrame, forecast_days: int = 30):
+    """
+    Uses Facebook's Prophet model to train and predict future stock prices.
+    """
+    if historical_data is None or len(historical_data) < 30:
+        return None, None
+
+    # Prophet requires columns 'ds' (datestamp) and 'y' (value)
+    prophet_df = historical_data[['Date', 'ClosingPrice']].rename(columns={'Date': 'ds', 'ClosingPrice': 'y'})
+
+    # Initialize and train the model
+    # We include Taiwan holidays to improve the model's accuracy
+    model = Prophet(daily_seasonality=True)
+    model.add_country_holidays(country_name='TW')
+    model.fit(prophet_df)
+
+    # Create a future dataframe for predictions
+    future = model.make_future_dataframe(periods=forecast_days)
+    forecast = model.predict(future)
+
+    # Extract the forecast and format it for the web app
+    forecast_df = forecast[['ds', 'yhat']].tail(forecast_days)
+    forecast_df = forecast_df.rename(columns={'ds': 'Date', 'yhat': 'PredictedPrice'})
+
+    # Prophet does not provide a simple equivalent to 'latest_features' like XGBoost.
+    # We will return an empty dictionary to maintain a consistent API.
+    return forecast_df, {}

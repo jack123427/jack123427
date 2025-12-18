@@ -7,7 +7,7 @@ import os
 # 將專案根目錄加入 sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.model import train_and_predict, backtest_model, create_features
+from src.model import train_and_predict, train_and_predict_prophet, backtest_model, create_features
 
 class TestModel(unittest.TestCase):
 
@@ -63,6 +63,16 @@ class TestModel(unittest.TestCase):
         self.assertIsNotNone(mape)
         self.assertIsInstance(mape, float)
         self.assertGreaterEqual(mape, 0.0)
+
+    def test_train_and_predict_prophet(self):
+        """Test the Prophet model prediction pipeline."""
+        forecast_df, latest_features = train_and_predict_prophet(self.sample_history, forecast_days=5)
+
+        self.assertIsNotNone(forecast_df, "Prophet forecast DataFrame should not be None")
+        self.assertIsInstance(latest_features, dict, "Prophet features should be an empty dict")
+        self.assertEqual(len(latest_features), 0, "Prophet features dict should be empty")
+        self.assertEqual(len(forecast_df), 5, "Prophet forecast should contain 5 days of data")
+        self.assertIn('PredictedPrice', forecast_df.columns)
 
 if __name__ == '__main__':
     unittest.main()

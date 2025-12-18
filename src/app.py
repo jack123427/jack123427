@@ -9,7 +9,7 @@ if _root_dir not in sys.path:
     sys.path.insert(0, _root_dir)
 
 from src.data_fetcher import get_historical_data, get_top_100_stocks
-from src.model import train_and_predict
+from src.model import train_and_predict, train_and_predict_prophet
 from flask import Flask, request, render_template
 
 app = Flask(__name__, template_folder='../templates')
@@ -17,9 +17,11 @@ app = Flask(__name__, template_folder='../templates')
 @app.route('/', methods=['GET'])
 def index():
     """
-    Renders the main page, handles stock prediction requests, and provides a list of top 100 companies.
+    Renders the main page, handles stock prediction requests based on the selected model,
+    and provides a list of top 100 companies.
     """
     stock_code = request.args.get('stock_code')
+    model_type = request.args.get('model_type', 'xgboost') # Default to XGBoost
 
     # Fetch the list of top 100 companies for the dropdown menu
     top_100 = get_top_100_stocks()
@@ -29,7 +31,7 @@ def index():
 
     # If no stock code is provided, just render the main page
     if not stock_code:
-        return render_template('index.html', stock_list=stock_list)
+        return render_template('index.html', stock_list=stock_list, selected_model=model_type)
 
     # If a stock code is provided, run the prediction
     try:
@@ -38,25 +40,32 @@ def index():
 
         if history_df is None or history_df.empty:
             error_msg = f"Could not find historical data for {stock_code}. Please check the stock symbol."
-            return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
+            return render_template('index.html', error=error_msg, stock_list=stock_list, selected_stock_code=stock_code, selected_model=model_type)
 
-        print(f"Training model and making prediction for {stock_code}...")
-        forecast_df, latest_features = train_and_predict(history_df, forecast_days=30)
+        print(f"Training model '{model_type}' and making prediction for {stock_code}...")
+        if model_type == 'prophet':
+            forecast_df, latest_features = train_and_predict_prophet(history_df, forecast_days=30)
+        else: # Default to XGBoost
+            forecast_df, latest_features = train_and_predict(history_df, forecast_days=30)
 
         if forecast_df is None:
-            error_msg = f"An error occurred while predicting for {stock_code}. There may be insufficient data."
-            return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
+            error_msg = f"An error occurred while predicting for {stock_code} with the {model_type} model. There may be insufficient data."
+            return render_template('index.html', error=error_msg, stock_list=stock_list, selected_stock_code=stock_code, selected_model=model_type)
 
         # Prepare data for the chart (last 90 days of history + 30 days of forecast)
         history_df_chart = history_df.tail(90)
         historical_data = history_df_chart.to_dict('records')
         forecast_data = forecast_df.to_dict('records')
 
-        # Format dates
+        from datetime import date
+
+        # Format dates for JSON serialization, handling both pd.Timestamp and datetime.date
         for item in historical_data:
-            item['Date'] = item['Date'].strftime('%Y-%m-%d')
+            if isinstance(item['Date'], (pd.Timestamp, date)):
+                item['Date'] = item['Date'].strftime('%Y-%m-%d')
         for item in forecast_data:
-            item['Date'] = item['Date'].strftime('%Y-%m-%d')
+            if isinstance(item['Date'], (pd.Timestamp, date)):
+                item['Date'] = item['Date'].strftime('%Y-%m-%d')
 
         # Get the company name for display
         stock_name = ""
@@ -67,17 +76,18 @@ def index():
 
         print("Prediction complete, rendering results page.")
         return render_template('index.html',
-                               stock_code=stock_code,
+                               selected_stock_code=stock_code,
                                stock_name=stock_name,
                                historical_data=historical_data,
                                forecast_data=forecast_data,
                                stock_list=stock_list,
-                               features=latest_features)
+                               features=latest_features if latest_features else None,
+                               selected_model=model_type)
 
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         error_msg = f"An unexpected error occurred: {str(e)}"
-        return render_template('index.html', error=error_msg, stock_list=stock_list, stock_code=stock_code)
+        return render_template('index.html', error=error_msg, stock_list=stock_list, selected_stock_code=stock_code, selected_model=model_type)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

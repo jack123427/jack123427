@@ -30,16 +30,20 @@
     <div class="container">
         <h1>台灣市值百大個股預測</h1>
 
-        <form action="/" method="get">
-            <select name="stock_code" required>
+        <form id="predictionForm" action="/" method="get">
+            <select id="stockSelector" name="stock_code" required>
                 <option value="">請選擇一支股票</option>
                 {% for stock in stock_list %}
-                    <option value="{{ stock.公司代號 }}" {% if stock.公司代號 == stock_code %}selected{% endif %}>
+                    <option value="{{ stock.公司代號 }}" {% if stock.公司代號 == selected_stock_code %}selected{% endif %}>
                         {{ stock.公司代號 }} - {{ stock.公司簡稱 }}
                     </option>
                 {% endfor %}
             </select>
-            <button type="submit">開始預測</button>
+            <select id="modelSelector" name="model_type" required>
+                <option value="xgboost" {% if selected_model == 'xgboost' %}selected{% endif %}>XGBoost</option>
+                <option value="prophet" {% if selected_model == 'prophet' %}selected{% endif %}>Prophet</option>
+            </select>
+            <button id="predictBtn" type="submit">開始預測</button>
         </form>
 
         {% if error %}
@@ -100,9 +104,13 @@
 
     <script>
     {% if stock_code and historical_data and forecast_data %}
+        console.log("--- STARTING CHART SCRIPT ---");
         const historicalData = {{ historical_data | tojson }};
         const forecastData = {{ forecast_data | tojson }};
         const stockCode = {{ stock_code | tojson }};
+
+        console.log("Historical Data:", historicalData);
+        console.log("Forecast Data:", forecastData);
 
         const ctx = document.getElementById('predictionChart').getContext('2d');
 

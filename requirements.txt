@@ -28,3 +28,5 @@ xgboost
 pytest
 matplotlib
 python-docx
+prophet
+plotly
