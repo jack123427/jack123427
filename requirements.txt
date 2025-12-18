@@ -25,3 +25,6 @@ urllib3
 Werkzeug
 yfinance
 xgboost
+pytest
+matplotlib
+python-docx

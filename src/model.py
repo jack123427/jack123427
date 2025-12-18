@@ -61,9 +61,12 @@ def create_features(price_df, institutional_df=None, margin_df=None, stock_code=
 
     return df
 
+import joblib
+import os
+
 def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     """
-    Uses XGBoost model to train and predict future stock prices.
+    Uses a two-pass XGBoost model to train with feature selection and predict future stock prices.
     """
     if historical_data is None or len(historical_data) < 30:
         return None, None
@@ -71,55 +74,98 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
     historical_data.dropna(subset=['Date'], inplace=True)
     stock_code = historical_data['公司代號'].iloc[0]
 
+    # --- Model Caching ---
+    model_dir = "models"
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, f"{stock_code}.joblib")
+    features_path = os.path.join(model_dir, f"{stock_code}_features.joblib")
+
     try:
-        # Define date range for fetching chip data
-        end_date = historical_data['Date'].max()
-        start_date = historical_data['Date'].min()
+        # Try to load a pre-trained model and its features
+        if os.path.exists(model_path) and os.path.exists(features_path):
+            print(f"Loading cached model for stock {stock_code}...")
+            reg = joblib.load(model_path)
+            SELECTED_FEATURES = joblib.load(features_path)
+            # We still need to create all features first for the iterative prediction loop
+            end_date = historical_data['Date'].max()
+            start_date = historical_data['Date'].min()
+            institutional_df = fetch_institutional_trading(start_date, end_date)
+            margin_df = fetch_margin_trading(start_date, end_date)
+        else:
+            print(f"No cached model found for {stock_code}. Training a new one.")
+            # --- Data Fetching and Feature Engineering ---
+            end_date = historical_data['Date'].max()
+            start_date = historical_data['Date'].min()
+            institutional_df = fetch_institutional_trading(start_date, end_date)
+            margin_df = fetch_margin_trading(start_date, end_date)
 
-        # Fetch new data
-        print(f"Fetching institutional and margin data from {start_date} to {end_date}...")
-        institutional_df = fetch_institutional_trading(start_date, end_date)
-        margin_df = fetch_margin_trading(start_date, end_date)
+            features_df = create_features(historical_data, institutional_df, margin_df, stock_code)
+            features_df.bfill(inplace=True)
+            features_df.dropna(inplace=True)
 
-        # Filter for the specific stock
-        # Create features
-        features_df = create_features(historical_data, institutional_df, margin_df, stock_code)
-        features_df.bfill(inplace=True)
-        features_df.dropna(inplace=True)
+            ALL_FEATURES = [col for col in features_df.columns if col not in ['Date', '公司代號', 'ClosingPrice']]
+            TARGET = 'ClosingPrice'
 
-        FEATURES = [col for col in features_df.columns if col not in ['Date', '公司代號', 'ClosingPrice']]
-        TARGET = 'ClosingPrice'
+            X_all = features_df[ALL_FEATURES]
+            y = features_df[TARGET]
 
-        X = features_df[FEATURES]
-        y = features_df[TARGET]
+            if X_all.empty or y.empty:
+                print("Dataset is empty after feature creation. Cannot train model.")
+                return None, None
 
-        if X.empty or y.empty:
-            print("After feature creation, the dataset is empty. Cannot train model.")
-            return None, None
+            # --- Feature Selection ---
+            # We must only train on features that can be calculated during the prediction loop.
+            # Chip-based features are historical and not available for future dates.
+            print("Selecting features for final model training...")
 
-        reg = xgb.XGBRegressor(n_estimators=1000, early_stopping_rounds=50,
-                               objective='reg:squarederror',
-                               eval_metric='rmse')
-        reg.fit(X, y, eval_set=[(X, y)], verbose=False)
+            # Define chip-based features that should be excluded from the final model
+            chip_features = [
+                'Foreign_Net_Buy_Sell', 'Investment_Trust_Net_Buy_Sell', 'Dealer_Net_Buy_Sell',
+                'Total_Institutional_Net_Buy_Sell', 'foreign_ma5', 'foreign_momentum',
+                'Margin_Balance', 'Short_Balance', 'Margin_Purchase', 'Margin_Sale',
+                'Short_Purchase', 'Short_Sale', 'margin_balance_change', 'short_balance_change',
+                'short_margin_ratio', 'Total_Net_Buy_Sell'
+            ]
 
-        # Iterative forecasting
+            # Features available for the final model are all features minus the chip-based ones
+            final_model_features = [f for f in ALL_FEATURES if f not in chip_features]
+
+            if not final_model_features:
+                 raise ValueError("No features available for training after excluding chip-based features.")
+
+            # We don't need a two-pass system anymore. We train on the reliable features directly.
+            SELECTED_FEATURES = final_model_features
+            print(f"Training model with {len(SELECTED_FEATURES)} features: {SELECTED_FEATURES}")
+
+            # --- Pass 2: Final Model Training ---
+            print("Running final training pass with selected features...")
+            X_selected = features_df[SELECTED_FEATURES]
+
+            reg = xgb.XGBRegressor(n_estimators=1000, early_stopping_rounds=50,
+                                   objective='reg:squarederror', eval_metric='rmse')
+            reg.fit(X_selected, y, eval_set=[(X_selected, y)], verbose=False)
+
+            # --- Save the trained model and selected features ---
+            print(f"Saving new model and features for stock {stock_code} to cache.")
+            joblib.dump(reg, model_path)
+            joblib.dump(SELECTED_FEATURES, features_path)
+
+        # --- Iterative Forecasting ---
         print("Starting iterative forecasting...")
         predictions = []
-        # Start with the full historical data for feature creation
         future_df = historical_data.copy()
 
         for i in range(forecast_days):
-            # 1. Create features for the current dataset
-            features_for_pred = create_features(future_df, institutional_df, margin_df, stock_code)
+            # For future predictions, we don't have real chip data.
+            # We rely on technical indicators calculated from the predicted prices.
+            features_for_pred = create_features(future_df, institutional_df=None, margin_df=None, stock_code=stock_code)
             features_for_pred.bfill(inplace=True)
             features_for_pred.dropna(inplace=True)
 
-            # 2. Predict the next step using the last row of features
-            last_features = features_for_pred.iloc[-1:][FEATURES]
+            last_features = features_for_pred.iloc[-1:][SELECTED_FEATURES]
             pred = reg.predict(last_features)[0]
             predictions.append(pred)
 
-            # 3. Create a new row for the next day and append it
             last_date = future_df['Date'].iloc[-1]
             new_row = pd.DataFrame({
                 'Date': [last_date + pd.Timedelta(days=1)],
@@ -129,17 +175,19 @@ def train_and_predict(historical_data: pd.DataFrame, forecast_days: int = 30):
             future_df = pd.concat([future_df, new_row], ignore_index=True)
         print("Iterative forecasting complete.")
 
-
         future_dates = pd.date_range(start=historical_data['Date'].iloc[-1] + pd.Timedelta(days=1), periods=forecast_days)
         forecast_df = pd.DataFrame({'Date': future_dates, 'PredictedPrice': predictions})
 
-        # Return the latest features as well
-        latest_features = features_df.iloc[-1][FEATURES].to_dict()
+        # Create the final features_df for returning latest feature values
+        final_features_df = create_features(historical_data, institutional_df, margin_df, stock_code)
+        latest_features = final_features_df.iloc[-1][SELECTED_FEATURES].to_dict()
 
         return forecast_df, latest_features
 
     except Exception as e:
-        print(f"Error during model training or prediction: {e}")
+        print(f"Error during model training or prediction for stock {stock_code}: {e}")
+        import traceback
+        traceback.print_exc()
         return None, None
 
 def backtest_model(historical_data: pd.DataFrame, test_days: int = 10):
