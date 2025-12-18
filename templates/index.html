@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣市值百大個股預測</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        .container { max-width: 1000px; margin: auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        form { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; gap: 10px; }
+        select { font-size: 16px; padding: 8px; border-radius: 4px; border: 1px solid #ddd; }
+        button { font-size: 16px; padding: 10px 20px; border: none; background-color: #007bff; color: white; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .chart-container { width: 95%; height: 500px; margin: 30px auto; }
+        .tables-wrapper { display: flex; gap: 20px; justify-content: center; }
+        .table-container { flex-basis: 45%; }
+        h2 { color: #444; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        .error { text-align: center; color: #D8000C; background-color: #FFD2D2; padding: 10px; border-radius: 4px; margin-top: 20px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>台灣市值百大個股預測</h1>
+
+        <form id="predictionForm" action="/" method="get">
+            <select id="stockSelector" name="stock_code" required>
+                <option value="">請選擇一支股票</option>
+                {% for stock in stock_list %}
+                    <option value="{{ stock.公司代號 }}" {% if stock.公司代號 == selected_stock_code %}selected{% endif %}>
+                        {{ stock.公司代號 }} - {{ stock.公司簡稱 }}
+                    </option>
+                {% endfor %}
+            </select>
+            <select id="modelSelector" name="model_type" required>
+                <option value="xgboost" {% if selected_model == 'xgboost' %}selected{% endif %}>XGBoost</option>
+                <option value="prophet" {% if selected_model == 'prophet' %}selected{% endif %}>Prophet</option>
+            </select>
+            <button id="predictBtn" type="submit">開始預測</button>
+        </form>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if stock_code and historical_data and forecast_data %}
+        <div class="chart-container">
+            <h2>{{ stock_code }} - {{ stock_name }} 走勢與預測</h2>
+            <canvas id="predictionChart"></canvas>
+        </div>
+
+        <div class="tables-wrapper">
+            <div class="table-container">
+                <h2>預測結果 (未來30日)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>預測收盤價</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in forecast_data %}
+                        <tr>
+                            <td>{{ item.Date }}</td>
+                            <td>{{ "%.2f"|format(item.PredictedPrice) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if features %}
+            <div class="table-container">
+                <h2>模型輸入參數</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>參數名稱</th>
+                            <th>數值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, value in features.items() %}
+                        <tr>
+                            <td>{{ key }}</td>
+                            <td>{{ "%.4f"|format(value) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    {% if stock_code and historical_data and forecast_data %}
+        console.log("--- STARTING CHART SCRIPT ---");
+        const historicalData = {{ historical_data | tojson }};
+        const forecastData = {{ forecast_data | tojson }};
+        const stockCode = {{ stock_code | tojson }};
+
+        console.log("Historical Data:", historicalData);
+        console.log("Forecast Data:", forecastData);
+
+        const ctx = document.getElementById('predictionChart').getContext('2d');
+
+        const historyLabels = historicalData.map(item => item.Date);
+        const forecastLabels = forecastData.map(item => item.Date);
+        const allLabels = [...historyLabels, ...forecastLabels];
+
+        const historyPrices = historicalData.map(item => item.ClosingPrice);
+        const forecastPrices = [historyPrices[historyPrices.length - 1], ...forecastData.map(item => item.PredictedPrice)];
+        const paddedForecastPrices = new Array(historyLabels.length - 1).fill(null).concat(forecastPrices);
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allLabels,
+                datasets: [
+                    {
+                        label: `歷史收盤價`,
+                        data: historyPrices,
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 1.5,
+                        fill: true,
+                    },
+                    {
+                        label: '預測收盤價',
+                        data: paddedForecastPrices,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        borderDash: [5, 5],
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: { title: { display: true, text: '日期' } },
+                    y: { title: { display: true, text: '收盤價 (TWD)' } }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    {% endif %}
+    </script>
+</body>
+</html>
